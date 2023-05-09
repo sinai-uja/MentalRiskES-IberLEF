@@ -119,8 +119,8 @@ class BinaryClassification():
             _latencyweightedF1 = 0
             _speed = 0
             
-        y_true = self.run_results['pred'].tolist() 
-        y_pred_b = list(self.qrels_b.values()) 
+        y_pred_b = self.run_results['pred'].tolist() 
+        y_true = list(self.qrels_b.values()) 
 
         # Binary metrics
         accuracy = metrics.accuracy_score(y_true, y_pred_b)
@@ -209,9 +209,8 @@ class ClassRegressionEvaluation():
 
     def eval_performance(self):
         self.run_results = self.run_results.sort_values(by=['nick'])
-        y_true = self.run_results['pred'].tolist() 
-        
-        y_pred_r = list(self.qrels.values()) 
+        y_pred_r = self.run_results['pred'].tolist() 
+        y_true = list(self.qrels.values()) 
 
         # Regression metrics
         _rmse = metrics.mean_squared_error(y_true, y_pred_r, sample_weight=None, multioutput='raw_values', squared=False)[0] 
@@ -348,8 +347,8 @@ class BinaryMultiClassification():
             _latencyweightedF1 = 0
             _speed = 0
             
-        y_true = self.run_results['pred'].tolist()
-        y_pred_b = list(self.qrels_multiclass.values())
+        y_pred_b = self.run_results['pred'].tolist()
+        y_true = list(self.qrels_multiclass.values())
 
         # Binary metrics
         accuracy = metrics.accuracy_score(y_true, y_pred_b)
@@ -439,8 +438,8 @@ class ClassMultiRegressionEvaluation():
 
     def eval_performance(self):
         self.run_results = self.run_results.sort_values(by=['nick'])
-        y_true = self.run_results['pred'].tolist() 
-        y_pred_r = list(self.qrels.values()) 
+        y_pred_r = self.run_results['pred'].tolist() 
+        y_true = list(self.qrels.values()) 
 
         # Regression metrics
         _rmse = metrics.mean_squared_error(y_true, y_pred_r, sample_weight=None, multioutput='raw_values', squared=False)[0]
