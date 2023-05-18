@@ -195,14 +195,12 @@ class ClassRegressionEvaluation():
 
         # Regression metrics
         _rmse = metrics.mean_squared_error(y_true, y_pred_r, sample_weight=None, multioutput='raw_values', squared=False)[0] 
-        _pearson = np.corrcoef(y_true, y_pred_r)
         _pearson, _ = pearsonr(y_true, y_pred_r)
 
         print("REGRESSION METRICS: =============================")
         print("RMSE:"+str(_rmse))
         print("Pearson correlation coefficient:"+str(_pearson))
-
-        return { 'RMSE:': _rmse, 'Pearson_coefficient': _pearson}
+        return { 'RMSE': _rmse, 'Pearson_coefficient': _pearson}
 
 
 ############################################################################
@@ -367,7 +365,7 @@ class ClassMultiRegressionEvaluation():
         print("Pearson so:"+str(_pearson_so))
         print("Pearson c:"+str(_pearson_c))
         pearson = (_pearson_sf + _pearson_sa + _pearson_so + _pearson_c)/4
-        return { 'RMSE:': _rmse, 'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
+        return { 'RMSE': _rmse, 'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
 
 #######################################################################################
 # Class for calculating carbon emission values
