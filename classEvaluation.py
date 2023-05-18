@@ -152,52 +152,33 @@ class BinaryClassification():
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
 
     # Calculation of P@10, P@20, P@30, P@50
-    def eval_performance_rank_based(self):
+    def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
         print("RANK-BASED EVALUATION:")
-        ranks_at=[1,50,75] 
+        results_at=[results_rank1,results_rank2,results_rank3,results_rank4] 
         rank_dit = {}
-        for rank in ranks_at:
-            print("Analizing ranking at round "+str(rank))
-            rels_topk = [0,0,0,0] 
-            self.run_results["label"] = self.qrels_b.values()
-            self.run_results = self.run_results.sort_values(by=['pred'],ascending=False) 
-            i = 0
-            for index, r in self.run_results.iterrows():
-                if i<10:
-                    if r["pred"] == r['label']:
-                        rels_topk[0] += 1
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<20:
-                    if r["pred"] == r['label']:
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<30:
-                    if r["pred"] == r['label']:
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<50:
-                    if r["pred"] == r['label']:
-                        rels_topk[3] += 1
-                else:
-                    break
-                i+=1
-            p10 = float(rels_topk[0])/10.0
-            p20 = float(rels_topk[1])/20.0
-            p30 = float(rels_topk[2])/30.0
-            p50 = float(rels_topk[3])/50.0
-
-            print("PRECISION AT K: =============================")
-            print("P@10:"+str(p10))
-            print("P@20:"+str(p20))
-            print("P@30:"+str(p30))
-            print("P@50:"+str(p50))
-            rank_dit[rank] = {"@10":p10,"@20":p20,"@30":p30,"@50":p50}
+        for results in results_at:
+            rank = results.split("_")[-1].split(".")[0]
+            print("Analizing ranking at round "+rank)
+            p = []
+            if os.path.exists(results):
+                run_results = pd.read_json(results,orient='index').sort_values(by=['pred'],ascending=False) 
+                run_results['nick'] = run_results.index
+                for k in [10,20,30,50]:
+                    top_k_results = run_results.head(k)
+                    correct_predictions = 0
+                    for index, result in top_k_results.iterrows():
+                        correct_predictions += self.qrels_b[result['nick']]
+                    p.append(correct_predictions / k)
+                print("PRECISION AT K: =============================")
+                print("P@10:"+str(p[0]))
+                print("P@20:"+str(p[1]))
+                print("P@30:"+str(p[2]))
+                print("P@50:"+str(p[3]))
+                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
+            else:
+                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
         return rank_dit
-
 
 #############################################################################################
 # Calculation of Regression metrics for Simple regression tasks
@@ -223,53 +204,6 @@ class ClassRegressionEvaluation():
 
         return { 'RMSE:': _rmse, 'Pearson_coefficient': _pearson}
 
-    # Calculation of P@10, P@20, P@30, P@50
-    def eval_performance_rank_based(self):
-        print("===================================================")
-        print("RANK-BASED EVALUATION:")
-        ranks_at=[1,50,75] 
-        rank_dit = {}
-        for rank in ranks_at:
-            print("Analizing ranking at round "+str(rank))
-            rels_topk = [0,0,0,0] 
-            self.run_results["label"] = self.qrels.values()
-            self.run_results = self.run_results.sort_values(by=['pred'],ascending=False) 
-            i = 0
-            for index, r in self.run_results.iterrows():
-                if i<10:
-                    if r['label'] == round(r["pred"],1):
-                        rels_topk[0] += 1
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<20:
-                    if  r['label'] == round(r["pred"],1):
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<30:
-                    if  r['label'] == round(r["pred"],1):
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<50:
-                    if  r['label'] == round(r["pred"],1):
-                        rels_topk[3] += 1
-                else:
-                    break
-                i+=1
-            p10 = float(rels_topk[0])/10.0
-            p20 = float(rels_topk[1])/20.0
-            p30 = float(rels_topk[2])/30.0
-            p50 = float(rels_topk[3])/50.0
-
-            print("PRECISION AT K: =============================")
-            print("P@10:"+str(p10))
-            print("P@20:"+str(p20))
-            print("P@30:"+str(p30))
-            print("P@50:"+str(p50))
-            rank_dit[rank] = {"@10":p10,"@20":p20,"@30":p30,"@50":p50}
-        return rank_dit
-
 
 ############################################################################
 # Calculation of Binary metrics for Multiclass classification tasks
@@ -282,13 +216,9 @@ class BinaryMultiClassification():
 
     def penalty(self,delay):
         if self.task == "1": # TCA
-            p = 0.0411 # test
             p = 0.0292 # trial
         elif self.task == "2": # Depression
-            p = 0.0326 # test
             p = 0.0179 # trial
-        else: # Unkown
-            p = 0.0308 # test
         pen = -1.0 + 2.0/(1+np.exp(-p*(delay-1)))
         return(pen)
 
@@ -297,7 +227,6 @@ class BinaryMultiClassification():
         for key in self.qrels_b:
             total_pos += self.qrels_b[key]
         return(total_pos)
-
 
     def eval_performance(self):
         print("===================================================")
@@ -380,50 +309,32 @@ class BinaryMultiClassification():
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
     
     # Calculation of P@10, P@20, P@30, P@50
-    def eval_performance_rank_based(self):
+    def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
-        print("PRECISION AT K - EVALUATION:")
-        ranks_at=[1,50,75] 
+        print("RANK-BASED EVALUATION:")
+        results_at=[results_rank1,results_rank2,results_rank3,results_rank4]
         rank_dit = {}
-        for rank in ranks_at:
-            print("Analizing ranking at round "+str(rank))
-            rels_topk = [0,0,0,0]
-            self.run_results["label"] = self.qrels_b.values()
-            self.run_results = self.run_results.sort_values(by=['pred_b'],ascending=False) 
-            i = 0
-            for index, r in self.run_results.iterrows():
-                if i<10:
-                    if r["pred_b"] == r['label']:
-                        rels_topk[0] += 1
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<20:
-                    if r["pred_b"] == r['label']:
-                        rels_topk[1] += 1
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<30:
-                    if r["pred_b"] == r['label']:
-                        rels_topk[2] += 1
-                        rels_topk[3] += 1
-                elif i<50:
-                    if r["pred_b"] == r['label']:
-                        rels_topk[3] += 1
-                else:
-                    break
-                i+=1
-            p10 = float(rels_topk[0])/10.0
-            p20 = float(rels_topk[1])/20.0
-            p30 = float(rels_topk[2])/30.0
-            p50 = float(rels_topk[3])/50.0
-
-            print("PRECISION AT K: =============================")
-            print("P@10:"+str(p10))
-            print("P@20:"+str(p20))
-            print("P@30:"+str(p30))
-            print("P@50:"+str(p50))
-            rank_dit[rank] = {"@10":p10,"@20":p20,"@30":p30,"@50":p50}
+        for results in results_at:
+            rank = results.split("_")[-1].split(".")[0]
+            print("Analizing ranking at round "+rank)
+            p = []
+            if os.path.exists(results):
+                run_results = pd.read_json(results,orient='index').sort_values(by=['pred'],ascending=False) 
+                run_results['nick'] = run_results.index
+                for k in [10,20,30,50]:
+                    top_k_results = run_results.head(k)
+                    correct_predictions = 0
+                    for index, result in top_k_results.iterrows():
+                        correct_predictions += self.qrels_b[result['nick']]
+                    p.append(correct_predictions / k)
+                print("PRECISION AT K: =============================")
+                print("P@10:"+str(p[0]))
+                print("P@20:"+str(p[1]))
+                print("P@30:"+str(p[2]))
+                print("P@50:"+str(p[3]))
+                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
+            else:
+                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
         return rank_dit
 
 
@@ -457,60 +368,8 @@ class ClassMultiRegressionEvaluation():
         print("Pearson c:"+str(_pearson_c))
         pearson = (_pearson_sf + _pearson_sa + _pearson_so + _pearson_c)/4
         return { 'RMSE:': _rmse, 'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
-    
-    # Calculation of P@10, P@20, P@30, P@50
-    def eval_performance_rank_based(self):
-        print("===================================================")
-        print("PRECISION AT - EVALUATION:")
-        ranks_at=[1,50,75] 
-        rank_dit = {}
-        for rank in ranks_at:
-            print("Analizing ranking at round "+str(rank))
-            self.run_results["label"] = self.qrels.values()
-            self.run_results = self.run_results.sort_values(by=['pred'],ascending=False) 
-            p10 = 0
-            p20 = 0
-            p30 = 0
-            p50 = 0 
-            for j in range(0,4): 
-                rels_topk = [0,0,0,0]
-                i = 0
-                for index, r in self.run_results.iterrows():
-                    if i<10:
-                        if r['label'][j] == round(r["pred"][j],1):
-                            rels_topk[0] += 1
-                            rels_topk[1] += 1
-                            rels_topk[2] += 1
-                            rels_topk[3] += 1
-                    elif i<20:
-                        if r['label'][j] == round(r["pred"][j],1):
-                            rels_topk[1] += 1
-                            rels_topk[2] += 1
-                            rels_topk[3] += 1
-                    elif i<30:
-                        if r['label'][j] == round(r["pred"][j],1):
-                            rels_topk[2] += 1
-                            rels_topk[3] += 1
-                    elif i<50:
-                        if r['label'][j] == round(r["pred"][j],1):
-                            rels_topk[3] += 1
-                    else:
-                        break
-                    i+=1
-                p10 += float(rels_topk[0])/10.0
-                p20 += float(rels_topk[1])/20.0
-                p30 += float(rels_topk[2])/30.0
-                p50 += float(rels_topk[3])/50.0
 
-            print("PRECISION AT K: =============================")
-            print("P@10:"+str(p10/4))
-            print("P@20:"+str(p20/4))
-            print("P@30:"+str(p30/4))
-            print("P@50:"+str(p50/4))
-            rank_dit[rank] = {"@10":p10/4,"@20":p20/4,"@30":p30/4,"@50":p50/4}
-        return rank_dit
-
-
+#######################################################################################
 # Class for calculating carbon emission values
 class Emissions():
     def __init__(self, emissions_run) -> None:
