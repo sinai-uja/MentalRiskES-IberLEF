@@ -5,8 +5,9 @@ import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
 from scipy.stats import pearsonr
+import os
 
-# Read Gold labels for BinaryClassification
+# Read gold labels for binary classification (task1a, task2a, and task3a)
 def read_qrels(qrels_file):
     qrels={}
     df_golden_truth = pd.read_csv(qrels_file)
@@ -15,7 +16,7 @@ def read_qrels(qrels_file):
     print("\n"+str(len(qrels))+ " lines read in qrels file!\n\n")
     return(qrels)
 
-# Read Gold labels for Simple Regression
+# Read gold labels for simple regression (task1b, task2b and task3b)
 def read_qrels_regression(qrels_file):
     qrels={}
     df_golden_truth = pd.read_csv(qrels_file)
@@ -24,7 +25,7 @@ def read_qrels_regression(qrels_file):
     print("\n"+str(len(qrels))+ " lines read in qrels file!\n\n")
     return(qrels)
 
-# Read Gold labels for Multiclass classification
+# Read gold labels for multiclass classification (task2c)
 def read_qrels_multiclass(qrels_file):
     qrels={}
     qrels1 = {}
@@ -38,7 +39,7 @@ def read_qrels_multiclass(qrels_file):
     print("\n"+str(len(qrels))+ " lines read in qrels file!\n\n")
     return qrels, qrels1
 
-# Read Gold labels for Multi-output regression
+# Read gold labels for multi-output regression (task2d)
 def read_qrels_multioutput(qrels_file):
     qrels={}
     df_golden_truth = pd.read_csv(qrels_file)
@@ -72,11 +73,11 @@ class BinaryClassification():
 
     def eval_performance(self):
         print("===================================================")
-        print("DECISION-BASED EVALUATION:") 
+        print("EVALUATION:")
         self.run_results = self.run_results.sort_values(by=['nick'])
         total_pos=self.n_pos()
         erdes5 = np.zeros(len(self.run_results))
-        erdes50 = np.zeros(len(self.run_results))
+        erdes30 = np.zeros(len(self.run_results))
         ierdes = 0
         true_pos = 0
         false_pos = 0
@@ -86,25 +87,24 @@ class BinaryClassification():
         # Latency-based metrics
         for index, r in self.run_results.iterrows():
             try:
-                
                 if ( self.qrels_b[ r['nick'] ] ==  r['pred'] ):
                     if ( r['pred'] == 1 ):
                         true_pos+=1
                         erdes5[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 5.0)))
-                        erdes50[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 50.0)))
+                        erdes30[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 30.0)))
                         latency_tps.append(r["round"]+1)
                         penalty_tps.append(self.penalty(r["round"]+1))
                     else:
                         erdes5[ierdes]=0
-                        erdes50[ierdes]=0
+                        erdes30[ierdes]=0
                 else:
                     if ( r['pred'] == 1 ):
                         false_pos+=1
                         erdes5[ierdes]=float(total_pos)/float(len(self.qrels_b))
-                        erdes50[ierdes]=float(total_pos)/float(len(self.qrels_b))
+                        erdes30[ierdes]=float(total_pos)/float(len(self.qrels_b))
                     else:
                         erdes5[ierdes]=1
-                        erdes50[ierdes]=1
+                        erdes30[ierdes]=1
             except KeyError:
                 print("User does not appear in the qrels:"+r['nick'])
             ierdes+=1
@@ -142,20 +142,21 @@ class BinaryClassification():
 
         print("LATENCY-BASED METRICS: =============================")
         print("ERDE_5:"+str(np.mean(erdes5))) 
-        print("ERDE_50:"+str(np.mean(erdes50))) 
+        print("ERDE_30:"+str(np.mean(erdes30))) 
         print("Median latency:"+str(np.median(np.array(latency_tps)))) 
         print("Speed:"+str(_speed)) 
         print("latency-weightedF1:"+str(_latencyweightedF1)) 
         
-        return {'Accuracy': accuracy, 'Macro_P': macro_precision, 'Macro_R': macro_recall,'Macro_F1': macro_f1,'Micro_P': micro_precision, 'Micro_R': micro_recall,
-        'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE50': np.mean(erdes50), 'latencyTP': np.median(np.array(latency_tps)), 
+        return {'Acuracy': accuracy, 'Macro_P': macro_precision, 'Macro_R': macro_recall,'Macro_F1': macro_f1,'Micro_P': micro_precision, 'Micro_R': micro_recall,
+        'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE30': np.mean(erdes30), 'latencyTP': np.median(np.array(latency_tps)), 
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
-
+    
     # Calculation of P@10, P@20, P@30, P@50
+    # results_rank[x] corresponds to the name of the file containing the predictions made up to a certain round, this round depends on the task
     def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
         print("RANK-BASED EVALUATION:")
-        results_at=[results_rank1,results_rank2,results_rank3,results_rank4] 
+        results_at=[results_rank1,results_rank2,results_rank3,results_rank4]
         rank_dit = {}
         for results in results_at:
             rank = results.split("_")[-1].split(".")[0]
@@ -180,6 +181,7 @@ class BinaryClassification():
                 rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
         return rank_dit
 
+
 #############################################################################################
 # Calculation of Regression metrics for Simple regression tasks
 class ClassRegressionEvaluation():
@@ -194,7 +196,7 @@ class ClassRegressionEvaluation():
         y_true = list(self.qrels.values()) 
 
         # Regression metrics
-        _rmse = metrics.mean_squared_error(y_true, y_pred_r, sample_weight=None, multioutput='raw_values', squared=False)[0] 
+        _rmse = metrics.mean_squared_error(y_true, y_pred_r, squared=False)
         _pearson, _ = pearsonr(y_true, y_pred_r)
 
         print("REGRESSION METRICS: =============================")
@@ -228,11 +230,11 @@ class BinaryMultiClassification():
 
     def eval_performance(self):
         print("===================================================")
-        print("DECISION-BASED EVALUATION:") 
+        print("EVALUATION:") 
         self.run_results = self.run_results.sort_values(by=['nick'])
         total_pos=self.n_pos()
         erdes5 = np.zeros(len(self.run_results))
-        erdes50 = np.zeros(len(self.run_results))
+        erdes30 = np.zeros(len(self.run_results))
         ierdes = 0
         true_pos = 0
         false_pos = 0
@@ -241,25 +243,24 @@ class BinaryMultiClassification():
 
         for index, r in self.run_results.iterrows():
             try:
-                
                 if ( self.qrels_b[ r['nick'] ] ==  r['pred_b'] ):
                     if ( r['pred_b'] == 1 ):
                         true_pos+=1
                         erdes5[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 5.0)))
-                        erdes50[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 50.0)))
+                        erdes30[ierdes]=1.0 - (1.0/(1.0+np.exp( (r["round"]+1) - 30.0)))
                         latency_tps.append(r["round"]+1)
                         penalty_tps.append(self.penalty(r["round"]+1))
                     else:
                         erdes5[ierdes]=0
-                        erdes50[ierdes]=0
+                        erdes30[ierdes]=0
                 else:
                     if ( r['pred_b'] == 1 ):
                         false_pos+=1
                         erdes5[ierdes]=float(total_pos)/float(len(self.qrels_b))
-                        erdes50[ierdes]=float(total_pos)/float(len(self.qrels_b))
+                        erdes30[ierdes]=float(total_pos)/float(len(self.qrels_b))
                     else:
                         erdes5[ierdes]=1
-                        erdes50[ierdes]=1
+                        erdes30[ierdes]=1
             except KeyError:
                 print("User does not appear in the qrels:"+r['nick'])
             ierdes+=1
@@ -275,7 +276,7 @@ class BinaryMultiClassification():
             _speed = 0
             
         y_pred_b = self.run_results['pred'].tolist()
-        y_true = list(self.qrels_multiclass.values())
+        y_true  = list(self.qrels_multiclass.values())
 
         # Binary metrics
         accuracy = metrics.accuracy_score(y_true, y_pred_b)
@@ -297,13 +298,13 @@ class BinaryMultiClassification():
 
         print("LATENCY-BASED METRICS: =============================")
         print("ERDE_5:"+str(np.mean(erdes5)))
-        print("ERDE_50:"+str(np.mean(erdes50)))
+        print("ERDE_30:"+str(np.mean(erdes30)))
         print("Median latency:"+str(np.median(np.array(latency_tps)))) 
         print("Speed:"+str(_speed)) 
         print("latency-weightedF1:"+str(_latencyweightedF1)) 
         
-        return {'Accuracy': accuracy, 'Macro_P': macro_precision, 'Macro_R': macro_recall,'Macro_F1': macro_f1,'Micro_P': micro_precision, 'Micro_R': micro_recall,
-        'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE50': np.mean(erdes50), 'latencyTP': np.median(np.array(latency_tps)), 
+        return {'Acuracy': accuracy, 'Macro_P': macro_precision, 'Macro_R': macro_recall,'Macro_F1': macro_f1,'Micro_P': micro_precision, 'Micro_R': micro_recall,
+        'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE30': np.mean(erdes30), 'latencyTP': np.median(np.array(latency_tps)), 
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
     
     # Calculation of P@10, P@20, P@30, P@50
@@ -335,7 +336,6 @@ class BinaryMultiClassification():
                 rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
         return rank_dit
 
-
 #######################################################################################
 # Calculation of Regression metrics for Multi-output regression tasks
 class ClassMultiRegressionEvaluation():
@@ -351,23 +351,29 @@ class ClassMultiRegressionEvaluation():
         y_true = list(self.qrels.values()) 
 
         # Regression metrics
-        _rmse = metrics.mean_squared_error(y_true, y_pred_r, sample_weight=None, multioutput='raw_values', squared=False)[0]
+        _rmse = metrics.mean_squared_error(y_true, y_pred_r, multioutput='raw_values', squared=False)
         _pearson_sf, _ = pearsonr([item[0] for item in y_true] , [item[0] for item in y_pred_r])
         _pearson_sa, _ = pearsonr([item[1] for item in y_true] , [item[1] for item in y_pred_r])
         _pearson_so, _ = pearsonr([item[2] for item in y_true] , [item[2] for item in y_pred_r])
         _pearson_c, _ = pearsonr([item[3] for item in y_true] , [item[3] for item in y_pred_r])
-
+        rmse = sum(_rmse)/4
+        pearson = (_pearson_sf + _pearson_sa + _pearson_so + _pearson_c)/4
         print("REGRESSION METRICS: =============================")
-        print("RMSE:"+str(_rmse))
+        print("Root Mean Squared Error:")
+        print("RMSE mean:"+str(rmse))
+        print("RMSE sf:"+str(_rmse[0]))
+        print("RMSE sa:"+str(_rmse[1]))
+        print("RMSE so:"+str(_rmse[2]))
+        print("RMSE c:"+str(_rmse[3]))
         print("Pearson correlation coefficient:")
+        print("Pearson mean:"+str(pearson))
         print("Pearson sf:"+str(_pearson_sf))
         print("Pearson sa:"+str(_pearson_sa))
         print("Pearson so:"+str(_pearson_so))
         print("Pearson c:"+str(_pearson_c))
-        pearson = (_pearson_sf + _pearson_sa + _pearson_so + _pearson_c)/4
-        return { 'RMSE': _rmse, 'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
+        return { 'RMSE_mean': rmse, 'RMSE_sf': _rmse[0], 'RMSE_sa': _rmse[1], 'RMSE_so': _rmse[2], 'RMSE_c': _rmse[3],'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
 
-#######################################################################################
+
 # Class for calculating carbon emission values
 class Emissions():
     def __init__(self, emissions_run) -> None:
