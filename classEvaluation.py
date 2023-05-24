@@ -180,7 +180,7 @@ class ClassRegressionEvaluation():
         print("Pearson correlation coefficient:"+str(_pearson))
         return { 'RMSE': _rmse, 'Pearson_coefficient': _pearson}
     
-    # Calculation of P@10, P@20, P@30, P@50
+    # Calculation of P@5, P@10, P@20, P@30
     def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
         print("RANK-BASED EVALUATION:")
@@ -192,22 +192,24 @@ class ClassRegressionEvaluation():
             p = []
             if os.path.exists(results):
                 run_results = pd.read_json(results,orient='index').sort_values(by=['pred'],ascending=False) 
+                print(run_results)
                 run_results['nick'] = run_results.index
-                for k in [10,20,30,50]:
+                for k in [5,10,20,30]:
                     top_k_results = run_results.head(k)
                     correct_predictions = 0
                     for index, result in top_k_results.iterrows():
                         correct_predictions += self.qrels_b[result['nick']]
                     p.append(correct_predictions / k)
                 print("PRECISION AT K: =============================")
-                print("P@10:"+str(p[0]))
-                print("P@20:"+str(p[1]))
-                print("P@30:"+str(p[2]))
-                print("P@50:"+str(p[3]))
-                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
+                print("P@5:"+str(p[0]))
+                print("P@10:"+str(p[1]))
+                print("P@20:"+str(p[2]))
+                print("P@30:"+str(p[3]))
+                rank_dit[rank] = {"@5":p[0],"@10":p[1],"@20":p[2],"@30":p[3]}
             else:
-                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
+                rank_dit[rank] = {"@5":0,"@10":0,"@20":0,"@30":0}
         return rank_dit
+
 
 ############################################################################
 # Calculation of Binary metrics for Multiclass classification tasks
@@ -231,6 +233,7 @@ class BinaryMultiClassification():
         for key in self.qrels_b:
             total_pos += self.qrels_b[key]
         return(total_pos)
+
 
     def eval_performance(self):
         print("===================================================")
@@ -348,7 +351,7 @@ class ClassMultiRegressionEvaluation():
         print("Pearson c:"+str(_pearson_c))
         return { 'RMSE_mean': rmse, 'RMSE_sf': _rmse[0], 'RMSE_sa': _rmse[1], 'RMSE_so': _rmse[2], 'RMSE_c': _rmse[3],'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
 
-    # Calculation of P@10, P@20, P@30, P@50
+    # Calculation of P@5, P@10, P@20, P@30
     def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
         print("RANK-BASED EVALUATION:")
@@ -370,7 +373,7 @@ class ClassMultiRegressionEvaluation():
                 df2['nick'] = df2.index
                 df3 = df.sort_values(by=['control'],ascending=False) 
                 df3['nick'] = df3.index
-                for k in [10,20,30,50]:
+                for k in [5,10,20,30]:
                     i = 0
                     list_correct_predictions = []
                     for run_results in [df0,df1,df2,df3]:
@@ -381,15 +384,14 @@ class ClassMultiRegressionEvaluation():
                         i += 1
                         list_correct_predictions.append(correct_predictions/k) # Precision at k in one class
                     p.append(sum(list_correct_predictions)/len(list_correct_predictions))
-                print("lista:",p)
                 print("PRECISION AT K: =============================")
-                print("P@10:"+str(p[0]))
-                print("P@20:"+str(p[1]))
-                print("P@30:"+str(p[2]))
-                print("P@50:"+str(p[3]))
-                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
+                print("P@5:"+str(p[0]))
+                print("P@10:"+str(p[1]))
+                print("P@20:"+str(p[2]))
+                print("P@30:"+str(p[3]))
+                rank_dit[rank] = {"@5":p[0],"@10":p[1],"@20":p[2],"@30":p[3]}
             else:
-                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
+                rank_dit[rank] = {"@5":0,"@10":0,"@20":0,"@30":0}
         return rank_dit
 
 # Class for calculating carbon emission values
