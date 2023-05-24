@@ -42,11 +42,16 @@ def read_qrels_multiclass(qrels_file):
 # Read gold labels for multi-output regression (task2d)
 def read_qrels_multioutput(qrels_file):
     qrels={}
+    qrels1 = {}
     df_golden_truth = pd.read_csv(qrels_file)
     for index, r in df_golden_truth.iterrows():
         qrels[ r['Subject'] ] = [r['suffer_in_favour'],r['suffer_against'],r['suffer_other'],r['control']]
     print("\n"+str(len(qrels))+ " lines read in qrels file!\n\n")
-    return qrels
+
+    for subject, values in qrels.items():
+        max_index = values.index(max(values))
+        qrels1[subject] = [1 if i == max_index else 0 for i in range(len(values))]
+    return qrels, qrels1
 
 ###########################################################################
 # Calculation of Binary classification metrics for Binary classification tasks
@@ -150,9 +155,32 @@ class BinaryClassification():
         return {'Acuracy': accuracy, 'Macro_P': macro_precision, 'Macro_R': macro_recall,'Macro_F1': macro_f1,'Micro_P': micro_precision, 'Micro_R': micro_recall,
         'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE30': np.mean(erdes30), 'latencyTP': np.median(np.array(latency_tps)), 
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
+
+
+#############################################################################################
+# Calculation of Regression metrics for Simple regression tasks
+class ClassRegressionEvaluation():
+    def __init__(self, task, data, qrels):
+        self.run_results = data 
+        self.qrels = read_qrels_regression(qrels)
+        self.qrels_b = read_qrels(qrels)
+        self.task = task
+
+    def eval_performance(self):
+        self.run_results = self.run_results.sort_values(by=['nick'])
+        y_pred_r = self.run_results['pred'].tolist() 
+        y_true = list(self.qrels.values()) 
+
+        # Regression metrics
+        _rmse = metrics.mean_squared_error(y_true, y_pred_r, squared=False)
+        _pearson, _ = pearsonr(y_true, y_pred_r)
+
+        print("REGRESSION METRICS: =============================")
+        print("RMSE:"+str(_rmse))
+        print("Pearson correlation coefficient:"+str(_pearson))
+        return { 'RMSE': _rmse, 'Pearson_coefficient': _pearson}
     
     # Calculation of P@10, P@20, P@30, P@50
-    # results_rank[x] corresponds to the name of the file containing the predictions made up to a certain round, this round depends on the task
     def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
         print("===================================================")
         print("RANK-BASED EVALUATION:")
@@ -180,30 +208,6 @@ class BinaryClassification():
             else:
                 rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
         return rank_dit
-
-
-#############################################################################################
-# Calculation of Regression metrics for Simple regression tasks
-class ClassRegressionEvaluation():
-    def __init__(self, task, data, qrels):
-        self.run_results = data 
-        self.qrels = read_qrels_regression(qrels)
-        self.task = task
-
-    def eval_performance(self):
-        self.run_results = self.run_results.sort_values(by=['nick'])
-        y_pred_r = self.run_results['pred'].tolist() 
-        y_true = list(self.qrels.values()) 
-
-        # Regression metrics
-        _rmse = metrics.mean_squared_error(y_true, y_pred_r, squared=False)
-        _pearson, _ = pearsonr(y_true, y_pred_r)
-
-        print("REGRESSION METRICS: =============================")
-        print("RMSE:"+str(_rmse))
-        print("Pearson correlation coefficient:"+str(_pearson))
-        return { 'RMSE': _rmse, 'Pearson_coefficient': _pearson}
-
 
 ############################################################################
 # Calculation of Binary metrics for Multiclass classification tasks
@@ -277,7 +281,6 @@ class BinaryMultiClassification():
             
         y_pred_b = self.run_results['pred'].tolist()
         y_true  = list(self.qrels_multiclass.values())
-
         # Binary metrics
         accuracy = metrics.accuracy_score(y_true, y_pred_b)
         macro_precision = metrics.precision_score(y_true, y_pred_b, average='macro')
@@ -307,34 +310,6 @@ class BinaryMultiClassification():
         'Micro_F1': micro_f1, 'ERDE5':np.mean(erdes5),'ERDE30': np.mean(erdes30), 'latencyTP': np.median(np.array(latency_tps)), 
         'speed': _speed, 'latency-weightedF1': _latencyweightedF1}
     
-    # Calculation of P@10, P@20, P@30, P@50
-    def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
-        print("===================================================")
-        print("RANK-BASED EVALUATION:")
-        results_at=[results_rank1,results_rank2,results_rank3,results_rank4]
-        rank_dit = {}
-        for results in results_at:
-            rank = results.split("_")[-1].split(".")[0]
-            print("Analizing ranking at round "+rank)
-            p = []
-            if os.path.exists(results):
-                run_results = pd.read_json(results,orient='index').sort_values(by=['pred'],ascending=False) 
-                run_results['nick'] = run_results.index
-                for k in [10,20,30,50]:
-                    top_k_results = run_results.head(k)
-                    correct_predictions = 0
-                    for index, result in top_k_results.iterrows():
-                        correct_predictions += self.qrels_b[result['nick']]
-                    p.append(correct_predictions / k)
-                print("PRECISION AT K: =============================")
-                print("P@10:"+str(p[0]))
-                print("P@20:"+str(p[1]))
-                print("P@30:"+str(p[2]))
-                print("P@50:"+str(p[3]))
-                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
-            else:
-                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
-        return rank_dit
 
 #######################################################################################
 # Calculation of Regression metrics for Multi-output regression tasks
@@ -342,12 +317,12 @@ class ClassMultiRegressionEvaluation():
 
     def __init__(self, task, data, qrels):
         self.run_results = data 
-        self.qrels = read_qrels_multioutput(qrels)
+        self.qrels,self.qrels_b = read_qrels_multioutput(qrels)
         self.task = task
 
     def eval_performance(self):
         self.run_results = self.run_results.sort_values(by=['nick'])
-        y_pred_r = self.run_results['pred'].tolist() 
+        y_pred_r = self.run_results['pred'].tolist()
         y_true = list(self.qrels.values()) 
 
         # Regression metrics
@@ -373,6 +348,49 @@ class ClassMultiRegressionEvaluation():
         print("Pearson c:"+str(_pearson_c))
         return { 'RMSE_mean': rmse, 'RMSE_sf': _rmse[0], 'RMSE_sa': _rmse[1], 'RMSE_so': _rmse[2], 'RMSE_c': _rmse[3],'Pearson_mean': pearson,'Pearson_sf': _pearson_sf, 'Pearson_sa': _pearson_sa,'Pearson_so': _pearson_so,'Pearson_c': _pearson_c}
 
+    # Calculation of P@10, P@20, P@30, P@50
+    def eval_performance_rank_based(self,results_rank1,results_rank2,results_rank3,results_rank4):
+        print("===================================================")
+        print("RANK-BASED EVALUATION:")
+        results_at=[results_rank1,results_rank2,results_rank3,results_rank4]
+        rank_dit = {}
+        for results in results_at:
+            rank = results.split("_")[-1].split(".")[0]
+            print("Analizing ranking at round "+rank)
+            p = []
+            if os.path.exists(results):
+                run_results = pd.read_json(results,orient='index')
+                run_results[['suffer+against', 'suffer+in favour', 'suffer+other', 'control']] = run_results['pred'].apply(pd.Series)
+                df = run_results.drop('pred', axis=1)
+                df0 = df.sort_values(by=['suffer+in favour'],ascending=False)
+                df0['nick'] = df0.index
+                df1 = df.sort_values(by=['suffer+against'],ascending=False)
+                df1['nick'] = df1.index
+                df2 = df.sort_values(by=['suffer+other'],ascending=False) 
+                df2['nick'] = df2.index
+                df3 = df.sort_values(by=['control'],ascending=False) 
+                df3['nick'] = df3.index
+                for k in [10,20,30,50]:
+                    i = 0
+                    list_correct_predictions = []
+                    for run_results in [df0,df1,df2,df3]:
+                        top_k_results = run_results.head(k)
+                        correct_predictions = 0
+                        for index, result in top_k_results.iterrows():
+                            correct_predictions += self.qrels_b[result['nick']][i]
+                        i += 1
+                        list_correct_predictions.append(correct_predictions/k) # Precision at k in one class
+                    p.append(sum(list_correct_predictions)/len(list_correct_predictions))
+                print("lista:",p)
+                print("PRECISION AT K: =============================")
+                print("P@10:"+str(p[0]))
+                print("P@20:"+str(p[1]))
+                print("P@30:"+str(p[2]))
+                print("P@50:"+str(p[3]))
+                rank_dit[rank] = {"@10":p[0],"@20":p[1],"@30":p[2],"@50":p[3]}
+            else:
+                rank_dit[rank] = {"@10":0,"@20":0,"@30":0,"@50":0}
+        return rank_dit
 
 # Class for calculating carbon emission values
 class Emissions():
