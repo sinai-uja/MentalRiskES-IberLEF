@@ -1,7 +1,6 @@
 #This file has been developed by the SINAI research group for its usage in the MentalRiskES evaluation campaign at IberLEF 2023.
 
 # Required libraries
-# Required libraries
 import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
