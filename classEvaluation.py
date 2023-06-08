@@ -1,12 +1,13 @@
 #This file has been developed by the SINAI research group for its usage in the MentalRiskES evaluation campaign at IberLEF 2023.
 
 # Required libraries
+# Required libraries
 import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
 from scipy.stats import pearsonr
 import os
-
+import statistics
 # Read gold labels for binary classification (task1a, task2a, and task3a)
 def read_qrels(qrels_file):
     qrels={}
@@ -65,8 +66,12 @@ class BinaryClassification():
     def penalty(self,delay):
         if self.task == "1": # TCA
             p = 0.0292 # trial
+            p = 0.0411 # test
         elif self.task == "2": # Depression
             p = 0.0179 # trial
+            p = 0.0326 # test
+        else: # Unkown
+            p = 0.0308 # test
         pen = -1.0 + 2.0/(1+np.exp(-p*(delay-1)))
         return(pen)
 
@@ -223,8 +228,12 @@ class BinaryMultiClassification():
     def penalty(self,delay):
         if self.task == "1": # TCA
             p = 0.0292 # trial
+            p = 0.0411 # test
         elif self.task == "2": # Depression
             p = 0.0179 # trial
+            p = 0.0326 # test
+        else: # Unkown
+            p = 0.0308 # test
         pen = -1.0 + 2.0/(1+np.exp(-p*(delay-1)))
         return(pen)
 
@@ -406,11 +415,22 @@ class Emissions():
     # Update of values after a prediction has been made
     def update_emissions(self,emissions_round):
         # The values are accumulated in each round, so the difference is calculated to know the values for that round only
-        for key, value in self.emissions_run.items():
-            if key not in ["cpu_count","gpu_count","cpu_model","gpu_model", "ram_total_size"]:
-                round_ = emissions_round[key] - self.aux[key]
-            self.emissions_run[key].append(round_)
-            self.aux[key] = emissions_round[key]
+        if len(emissions_round.items()) != 0:
+            if emissions_round['duration'] < 1 :
+                return
+            if emissions_round['duration'] - self.aux['duration'] < 0 :
+                for key, value in self.aux.items():
+                    self.aux[key] = 0
+            for key, value in self.emissions_run.items():
+                if key not in ["cpu_count","gpu_count","cpu_model","gpu_model", "ram_total_size"]:
+                    round_ = emissions_round[key] - self.aux[key]
+                    self.emissions_run[key].append(round_)
+                    self.aux[key] = emissions_round[key]
+                else:
+                    self.emissions_run[key] = emissions_round[key]
+        else:
+            for key, value in self.aux.items():
+                self.aux[key] = 0
 
     # Calculation of final values after all predictions have been made
     def calculate_emissions(self):
@@ -418,11 +438,11 @@ class Emissions():
         for key, value in self.emissions_run.items():
             # Non-numerical values
             if key in ["cpu_count","gpu_count","cpu_model","gpu_model", "ram_total_size"]:
-                dict_[key] = self.emissions_run[key][0]
+                dict_[key] = self.emissions_run[key]
             # Numerical values
             else:
                 dict_[key+"_min"] = min(self.emissions_run[key])
                 dict_[key+"_max"] = max(self.emissions_run[key])
                 dict_[key+"_mean"] = sum(self.emissions_run[key])/len(self.emissions_run[key])
-                dict_[key+"_var"] = np.var(self.emissions_run[key])
+                dict_[key+"_desv"] = statistics.pstdev(self.emissions_run[key])
         return dict_
