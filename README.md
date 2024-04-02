@@ -1,6 +1,6 @@
-# MentalRiskES2023
+# MentalRiskES evaluation campaign
 
-## This is documentation related to MentalRiskES2023
+## This is documentation related to MentalRiskES evaluation campaign
 
 - The python file `classEvaluation.py` contains the metrics used in the evaluation phase.
 - `ClientServer.ipynb` contains an example of a connection to the server.
